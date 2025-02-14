@@ -2,6 +2,10 @@
 
 A ChatGPT-like chat interface built with modern web technologies. This project was developed following the amazing React practical tutorial made by [知行小课](https://github.com/zhixingxiaoke/react-hands-on-tutorial-for-beginners).
 
+### 📃 Preview(🚧 under building)
+
+![alt text](./public/images/preview.png)
+
 ### 🚀 Tech Stack
 
 - **React** - A JavaScript library for building user interfaces
@@ -13,7 +17,7 @@ A ChatGPT-like chat interface built with modern web technologies. This project w
 
 - Clean and intuitive chat interface
 - Real-time message updates
-- Responsive design for awesone UI/UX
+- Responsive design for awesome UI/UX
 - Interaction with current advanced LLM chatbots (such as GPT4 and DeepSeek v3)
 
 ### 🎯 Purpose
