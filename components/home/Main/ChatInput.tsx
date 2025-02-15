@@ -5,7 +5,7 @@ import { Message, MessageRequestBody } from "@/types/chat";
 import { useState } from "react";
 import { FiSend } from "react-icons/fi";
 import { MdRefresh } from "react-icons/md";
-import { PiLightningFill } from "react-icons/pi";
+import { PiLightningFill, PiStopBold } from "react-icons/pi";
 import TextareaAutosize from "react-textarea-autosize";
 import { v4 as uuidv4 } from "uuid";
 
@@ -90,9 +90,17 @@ export default function ChatInput() {
 "
     >
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center px-4 space-y-4">
-        <Button variant="primary" icon={MdRefresh} className="font-medium">
-          重新生成
-        </Button>
+        {messageList.length != 0 &&
+          (streamingId !== "" ? (
+            <Button variant="primary" icon={PiStopBold} className="font-medium">
+              停止生成
+            </Button>
+          ) : (
+            <Button variant="primary" icon={MdRefresh} className="font-medium">
+              重新生成
+            </Button>
+          ))}
+
         <div className="flex items-end w-full border-black/10 dark:border-gray-800/50 bg-white dark:bg-gray-700 rounded-lg shadow-[0_0_15px_rgba(0,0,0,0.1)] py-4">
           <div className="mx-3 mb-2.5">
             <PiLightningFill />
