@@ -12,6 +12,7 @@ export enum ActionType {
   UPDATE = "UPDATE",
   ADD_MESSAGE = "ADD_MESSAGE",
   UPDATE_MESSAGE = "UPDATE_MESSAGE",
+  REMOVE_MESSAGE = "REMOVE_MESSAGE",
 }
 
 type UpdateAction = {
@@ -21,7 +22,10 @@ type UpdateAction = {
 };
 
 type MessageAction = {
-  type: ActionType.ADD_MESSAGE | ActionType.UPDATE_MESSAGE;
+  type:
+    | ActionType.ADD_MESSAGE
+    | ActionType.UPDATE_MESSAGE
+    | ActionType.REMOVE_MESSAGE;
   message: Message;
 };
 
@@ -55,7 +59,12 @@ export function reducer(state: State, action: Action) {
       });
       return { ...state, messageList };
     }
-
+    case ActionType.REMOVE_MESSAGE: {
+      const messageList = state.messageList.filter((message) => {
+        return message.id !== action.message.id;
+      });
+      return { ...state, messageList };
+    }
     default:
       throw new Error("Unknown action type");
   }

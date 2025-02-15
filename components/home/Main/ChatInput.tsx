@@ -2,7 +2,7 @@ import { useAppContext } from "@/components/AppContext";
 import Button from "@/components/common/Button";
 import { ActionType } from "@/reducer/AppReducer";
 import { Message, MessageRequestBody } from "@/types/chat";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { FiSend } from "react-icons/fi";
 import { MdRefresh } from "react-icons/md";
 import { PiLightningFill, PiStopBold } from "react-icons/pi";
@@ -15,6 +15,12 @@ export default function ChatInput() {
     state: { currentModel, messageList, streamingId },
     dispatch,
   } = useAppContext();
+  // 控制停止生成. 使用useRef而不是useState的原因：
+  // 1. useRef 的值改变不会导致组件重新渲染，而 useState 的值改变会触发重渲染
+  // 2. 在异步操作中保持最新值. 如果使用 useState，在异步操作中可能会捕获到旧的状态值（闭包陷阱）useRef 的 .current 属性总是能获取到最新的值
+  // 3. 跨渲染周期保持值. useRef 在组件的整个生命周期中保持不变，即使组件重新渲染
+
+  const stopRef = useRef(false);
 
   async function send() {
     const message: Message = {
@@ -22,21 +28,43 @@ export default function ChatInput() {
       role: "user",
       content: messageText,
     };
-    const messages = messageList.concat([message]);
     dispatch({
       type: ActionType.ADD_MESSAGE,
       message: message,
     });
+    const messages = messageList.concat([message]);
+    doSend(messages);
+  }
+
+  async function resend() {
+    const messages = [...messageList];
+    if (
+      messages.length !== 0 &&
+      messages[messages.length - 1].role === "assistant"
+    ) {
+      dispatch({
+        type: ActionType.REMOVE_MESSAGE,
+        message: messages[messages.length - 1],
+      });
+      messages.splice(messages.length - 1, 1);
+    }
+    doSend(messages);
+  }
+
+  async function doSend(messages: Message[]) {
     setMessageText("");
     const body: MessageRequestBody = {
       messages: messages,
       model: currentModel,
     };
+    // 定义一个controller用于手动中止正在进行的网络请求（流式响应）
+    const controller = new AbortController();
     const response = await fetch("/api/chat", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
+      signal: controller.signal,
       body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -67,6 +95,11 @@ export default function ChatInput() {
     let done = false;
     let contentGenerating = "";
     while (!done) {
+      if (stopRef.current) {
+        stopRef.current = false;
+        controller.abort(); // 当用户点击“停止生成”按钮时，中止请求
+        break;
+      }
       const result = await reader.read();
       done = result.done;
       const chunk = decoder.decode(result.value);
@@ -92,11 +125,23 @@ export default function ChatInput() {
       <div className="w-full max-w-4xl mx-auto flex flex-col items-center px-4 space-y-4">
         {messageList.length != 0 &&
           (streamingId !== "" ? (
-            <Button variant="primary" icon={PiStopBold} className="font-medium">
+            <Button
+              variant="primary"
+              icon={PiStopBold}
+              className="font-medium"
+              onClick={() => {
+                stopRef.current = true;
+              }}
+            >
               停止生成
             </Button>
           ) : (
-            <Button variant="primary" icon={MdRefresh} className="font-medium">
+            <Button
+              variant="primary"
+              icon={MdRefresh}
+              className="font-medium"
+              onClick={() => resend()}
+            >
               重新生成
             </Button>
           ))}
