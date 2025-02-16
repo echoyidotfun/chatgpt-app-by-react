@@ -1,6 +1,9 @@
 import { useAppContext } from "@/components/AppContext";
 import Button from "@/components/common/Button";
-import { useEventBusContext } from "@/components/EventBusContext";
+import {
+  useEventBusContext,
+  EventListener,
+} from "@/components/EventBusContext";
 import { ActionType } from "@/reducer/AppReducer";
 import { Message, MessageRequestBody } from "@/types/chat";
 import { useEffect, useRef, useState } from "react";
@@ -15,7 +18,7 @@ export default function ChatInput() {
     state: { currentModel, messageList, streamingId, selectedChat },
     dispatch,
   } = useAppContext();
-  const { publish } = useEventBusContext();
+  const { publish, subscribe, unsubscribe } = useEventBusContext();
 
   // 控制停止生成. 使用useRef而不是useState的原因：
   // 1. useRef 的值改变不会导致组件重新渲染，而 useState 的值改变会触发重渲染
@@ -33,13 +36,22 @@ export default function ChatInput() {
     stopRef.current = true;
   }, [selectedChat]);
 
-  async function createOrUpdateMessage(message: Message) {
+  useEffect(() => {
+    // 从示例中产生新建对话事件
+    const callback: EventListener = ([data, title]) => {
+      send(data, title);
+    };
+    subscribe("createNewChat", callback);
+    return () => unsubscribe("createNewChat", callback);
+  }, []);
+
+  async function createOrUpdateMessage(message: Message, title?: string) {
     const response = await fetch("/api/message/update", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(message),
+      body: JSON.stringify({ ...message, title }),
     });
     if (!response.ok) {
       console.log(response.statusText);
@@ -47,7 +59,7 @@ export default function ChatInput() {
     }
     const { data } = await response.json();
     if (!chatIdRef.current) {
-      // 新对话 发送通知刷新对话列表
+      // 新对话 发送事件通知刷新对话列表
       chatIdRef.current = data.message.chatId;
       publish("fetchChatList");
       dispatch({
@@ -74,13 +86,16 @@ export default function ChatInput() {
     return code === 0;
   }
 
-  async function send() {
-    const message = await createOrUpdateMessage({
-      id: "",
-      role: "user",
-      content: messageText,
-      chatId: chatIdRef.current,
-    });
+  async function send(content: string, title?: string) {
+    const message = await createOrUpdateMessage(
+      {
+        id: "",
+        role: "user",
+        content,
+        chatId: chatIdRef.current,
+      },
+      title || ""
+    );
     dispatch({
       type: ActionType.ADD_MESSAGE,
       message: message,
@@ -224,7 +239,7 @@ export default function ChatInput() {
             icon={FiSend}
             disabled={messageText.trim() === "" || streamingId !== ""}
             variant="primary"
-            onClick={send}
+            onClick={() => send(messageText)}
           />
         </div>
       </div>

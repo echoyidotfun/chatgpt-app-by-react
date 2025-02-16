@@ -8,11 +8,11 @@ import { NextRequest, NextResponse } from "next/server";
  */
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { id, ...data } = body;
+  const { id, title, ...data } = body;
   if (!data.chatId) {
     const chat = await prisma.chat.create({
       data: {
-        title: "新对话",
+        title: title !== "" ? title : "新对话",
       },
     });
     data.chatId = chat.id;
