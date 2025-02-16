@@ -1,91 +1,54 @@
 import { groupByDate } from "@/common/util";
 import { Chat } from "@/types/chat";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ChatItem from "./ChatItem";
+import { useEventBusContext } from "@/components/EventBusContext";
+import { useAppContext } from "@/components/AppContext";
+import { ActionType } from "@/reducer/AppReducer";
 
 export default function ChatList() {
-  const [chatList, setChatList] = useState<Chat[]>([
-    {
-      id: "1",
-      title: "React入门实战教程",
-      updateTime: Date.now(),
-    },
-    {
-      id: "2",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "3",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "4",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "5",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "6",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "7",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "8",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "9",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "10",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "11",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "12",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "13",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "14",
-      title: "如何使用Next.js创建React项目",
-      updateTime: Date.now() - 1000 * 60 * 60 * 24 * 2,
-    },
-    {
-      id: "15",
-      title: "知行小课",
-      updateTime: Date.now() + 2,
-    },
-  ]);
+  const [chatList, setChatList] = useState<Chat[]>([]);
+  const pageRef = useRef(1);
+  const {
+    state: { selectedChat },
+    dispatch,
+  } = useAppContext();
 
-  const [selectedChat, setSelectedChat] = useState<Chat>();
   const groupList = useMemo(() => {
     return groupByDate(chatList);
-  }, chatList);
+  }, [chatList]);
+
+  const { subscribe, unsubscribe } = useEventBusContext();
+
+  async function getData() {
+    const response = await fetch(`/api/chat/list?page=${pageRef.current}`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      console.log(response.statusText);
+      return;
+    }
+    const { data } = await response.json();
+    if (pageRef.current == 1) {
+      setChatList(data.list);
+    } else {
+      setChatList((list) => list.concat(data.list));
+    }
+  }
+
+  useEffect(() => {
+    getData();
+  }, []);
+
+  useEffect(() => {
+    // 收到事件通知时，刷新对话列表
+    const callback: EventListener = () => {
+      pageRef.current = 1;
+      getData();
+    };
+    subscribe("fetchChatList", callback);
+    return () => unsubscribe("fetchChatList", callback);
+  }, []);
 
   return (
     <div className="flex-1 mb-[48px] mt-2 flex flex-col overflow-y-auto">
@@ -103,7 +66,13 @@ export default function ChatList() {
                     key={item.id}
                     item={item}
                     selected={selected}
-                    onSelected={(chat) => setSelectedChat(chat)}
+                    onSelected={(chat) => {
+                      dispatch({
+                        type: ActionType.UPDATE,
+                        field: "selectedChat",
+                        value: chat,
+                      });
+                    }}
                   />
                 );
               })}

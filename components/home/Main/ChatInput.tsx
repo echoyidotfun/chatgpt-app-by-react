@@ -1,5 +1,6 @@
 import { useAppContext } from "@/components/AppContext";
 import Button from "@/components/common/Button";
+import { useEventBusContext } from "@/components/EventBusContext";
 import { ActionType } from "@/reducer/AppReducer";
 import { Message, MessageRequestBody } from "@/types/chat";
 import { useRef, useState } from "react";
@@ -7,7 +8,6 @@ import { FiSend } from "react-icons/fi";
 import { MdRefresh } from "react-icons/md";
 import { PiLightningFill, PiStopBold } from "react-icons/pi";
 import TextareaAutosize from "react-textarea-autosize";
-import { v4 as uuidv4 } from "uuid";
 
 export default function ChatInput() {
   const [messageText, setMessageText] = useState("");
@@ -15,19 +15,59 @@ export default function ChatInput() {
     state: { currentModel, messageList, streamingId },
     dispatch,
   } = useAppContext();
+  const { subscribe, unsubscribe, publish } = useEventBusContext();
+
   // 控制停止生成. 使用useRef而不是useState的原因：
   // 1. useRef 的值改变不会导致组件重新渲染，而 useState 的值改变会触发重渲染
   // 2. 在异步操作中保持最新值. 如果使用 useState，在异步操作中可能会捕获到旧的状态值（闭包陷阱）useRef 的 .current 属性总是能获取到最新的值
   // 3. 跨渲染周期保持值. useRef 在组件的整个生命周期中保持不变，即使组件重新渲染
 
   const stopRef = useRef(false);
+  const chatIdRef = useRef("");
+
+  async function createOrUpdateMessage(message: Message) {
+    const response = await fetch("/api/message/update", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+    if (!response.ok) {
+      console.log(response.statusText);
+      return;
+    }
+    const { data } = await response.json();
+    if (!chatIdRef.current) {
+      // 新对话 发送通知刷新对话列表
+      chatIdRef.current = data.message.chatId;
+      publish("fetchChatList");
+    }
+    return data.message;
+  }
+
+  async function deleteMessage(id: string) {
+    const response = await fetch(`/api/message/delete?id=${id}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      console.log(response.statusText);
+      return false;
+    }
+    const { code } = await response.json();
+    return code === 0;
+  }
 
   async function send() {
-    const message: Message = {
-      id: uuidv4(),
+    const message = await createOrUpdateMessage({
+      id: "",
       role: "user",
       content: messageText,
-    };
+      chatId: chatIdRef.current,
+    });
     dispatch({
       type: ActionType.ADD_MESSAGE,
       message: message,
@@ -42,6 +82,11 @@ export default function ChatInput() {
       messages.length !== 0 &&
       messages[messages.length - 1].role === "assistant"
     ) {
+      const result = await deleteMessage(messages[messages.length - 1].id);
+      if (!result) {
+        console.log("detele error");
+        return;
+      }
       dispatch({
         type: ActionType.REMOVE_MESSAGE,
         message: messages[messages.length - 1],
@@ -76,15 +121,17 @@ export default function ChatInput() {
       return;
     }
     // 将bot回复内容加入消息列表
-    const responseMessage: Message = {
-      id: uuidv4(),
+    const responseMessage: Message = await createOrUpdateMessage({
+      id: "",
       role: "assistant",
       content: "",
-    };
+      chatId: chatIdRef.current,
+    });
     dispatch({
       type: ActionType.ADD_MESSAGE,
       message: responseMessage,
     });
+    // 更新消息流id是否等于当前消息id用于判断是否添加输入光标
     dispatch({
       type: ActionType.UPDATE,
       field: "streamingId",
@@ -110,6 +157,7 @@ export default function ChatInput() {
         message: { ...responseMessage, content: contentGenerating },
       });
     }
+    createOrUpdateMessage({ ...responseMessage, content: contentGenerating });
     dispatch({
       type: ActionType.UPDATE,
       field: "streamingId",

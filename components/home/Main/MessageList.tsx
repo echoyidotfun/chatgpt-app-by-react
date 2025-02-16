@@ -1,12 +1,42 @@
-import { Message } from "@/types/chat";
+import { useEffect } from "react";
 import { SiOpenai } from "react-icons/si";
 import Markdown from "@/components/common/Markdown";
 import { useAppContext } from "@/components/AppContext";
+import { ActionType } from "@/reducer/AppReducer";
 
 export default function MessageList() {
   const {
-    state: { messageList, streamingId },
+    state: { messageList, streamingId, selectedChat },
+    dispatch,
   } = useAppContext();
+
+  async function getMessages(chatId: string) {
+    const response = await fetch(`/api/message/list?chatId=${chatId}`, {
+      method: "GET",
+    });
+    if (!response.ok) {
+      console.log(response.statusText);
+      return;
+    }
+    const { data } = await response.json();
+    dispatch({
+      type: ActionType.UPDATE,
+      field: "messageList",
+      value: data.messages,
+    });
+  }
+
+  useEffect(() => {
+    if (selectedChat) {
+      getMessages(selectedChat.id);
+    } else {
+      dispatch({
+        type: ActionType.UPDATE,
+        field: "messageList",
+        value: [],
+      });
+    }
+  }, [selectedChat]);
 
   return (
     <div className="w-full pt-10 pb-48 dark:text-gray-300">
