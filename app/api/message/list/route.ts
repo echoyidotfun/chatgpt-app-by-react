@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
       chatId: chatId,
     },
     orderBy: {
-      createTime: "desc",
+      createTime: "asc",
     },
   });
   return NextResponse.json({ code: 0, data: { messages } });

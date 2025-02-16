@@ -3,7 +3,7 @@ import Button from "@/components/common/Button";
 import { useEventBusContext } from "@/components/EventBusContext";
 import { ActionType } from "@/reducer/AppReducer";
 import { Message, MessageRequestBody } from "@/types/chat";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FiSend } from "react-icons/fi";
 import { MdRefresh } from "react-icons/md";
 import { PiLightningFill, PiStopBold } from "react-icons/pi";
@@ -12,10 +12,10 @@ import TextareaAutosize from "react-textarea-autosize";
 export default function ChatInput() {
   const [messageText, setMessageText] = useState("");
   const {
-    state: { currentModel, messageList, streamingId },
+    state: { currentModel, messageList, streamingId, selectedChat },
     dispatch,
   } = useAppContext();
-  const { subscribe, unsubscribe, publish } = useEventBusContext();
+  const { publish } = useEventBusContext();
 
   // 控制停止生成. 使用useRef而不是useState的原因：
   // 1. useRef 的值改变不会导致组件重新渲染，而 useState 的值改变会触发重渲染
@@ -24,6 +24,14 @@ export default function ChatInput() {
 
   const stopRef = useRef(false);
   const chatIdRef = useRef("");
+
+  useEffect(() => {
+    if (chatIdRef.current === selectedChat?.id) {
+      return;
+    }
+    chatIdRef.current = selectedChat?.id ?? "";
+    stopRef.current = true;
+  }, [selectedChat]);
 
   async function createOrUpdateMessage(message: Message) {
     const response = await fetch("/api/message/update", {
@@ -42,6 +50,11 @@ export default function ChatInput() {
       // 新对话 发送通知刷新对话列表
       chatIdRef.current = data.message.chatId;
       publish("fetchChatList");
+      dispatch({
+        type: ActionType.UPDATE,
+        field: "selectedChat",
+        value: { id: chatIdRef.current },
+      });
     }
     return data.message;
   }
@@ -97,6 +110,8 @@ export default function ChatInput() {
   }
 
   async function doSend(messages: Message[]) {
+    stopRef.current = false;
+
     setMessageText("");
     const body: MessageRequestBody = {
       messages: messages,
@@ -143,7 +158,6 @@ export default function ChatInput() {
     let contentGenerating = "";
     while (!done) {
       if (stopRef.current) {
-        stopRef.current = false;
         controller.abort(); // 当用户点击“停止生成”按钮时，中止请求
         break;
       }
