@@ -37,14 +37,16 @@ export default function ChatList() {
       loadingRef.current = false;
       return;
     }
-    pageRef.current++;
     const { data } = await response.json();
     hasMoreRef.current = data.hasMore;
+    // pageRef.current++;
     if (pageRef.current == 1) {
       setChatList(data.list);
     } else {
       setChatList((list) => list.concat(data.list));
     }
+    // B
+    pageRef.current++;
     loadingRef.current = false;
   }
 
